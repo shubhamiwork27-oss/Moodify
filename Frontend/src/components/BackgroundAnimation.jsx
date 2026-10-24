@@ -9,11 +9,18 @@ export default function BackgroundAnimation() {
     if (!mount) return
 
     // ── Scene setup ──────────────────────────────────
+    let renderer
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
+    } catch (e) {
+      console.warn('WebGL is unavailable; using CSS gradient background.', e)
+      return
+    }
+
     const scene  = new THREE.Scene()
     const camera = new THREE.PerspectiveCamera(60, mount.clientWidth / mount.clientHeight, 0.1, 100)
     camera.position.z = 1.5
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.setSize(mount.clientWidth, mount.clientHeight)
     renderer.setClearColor(0x000000, 0)
@@ -107,13 +114,15 @@ export default function BackgroundAnimation() {
 
     // ── Cleanup ──────────────────────────────────────
     return () => {
-      cancelAnimationFrame(frameId)
+      if (frameId) cancelAnimationFrame(frameId)
       window.removeEventListener('resize', onResize)
-      renderer.dispose()
-      geometry.dispose(); material.dispose()
-      geo2.dispose(); mat2.dispose()
-      sprite.dispose()
-      if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement)
+      if (renderer) {
+        renderer.dispose()
+        geometry.dispose(); material.dispose()
+        geo2.dispose(); mat2.dispose()
+        sprite.dispose()
+        if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement)
+      }
     }
   }, [])
 
