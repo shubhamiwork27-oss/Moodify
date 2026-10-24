@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import * as faceapi from 'face-api.js';
 import axios from 'axios';
 import gsap from 'gsap';
@@ -21,6 +22,8 @@ import { RiMusicFill, RiHeartFill, RiHeadphoneFill,
          RiMovie2Fill, RiLeafFill, RiFlashlightFill } from 'react-icons/ri';
 import { GiLotus } from 'react-icons/gi';
 import './Home.css';
+
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 
 /* ─── song data ─────────────────────────── */
 const SONGS = [
@@ -98,6 +101,7 @@ const LIBRARY_ITEMS = [
 
 /* ─── component ─────────────────────────── */
 export default function Home() {
+  const navigate    = useNavigate();
   const videoRef    = useRef(null);
   const canvasRef   = useRef(null);
   const audioRef    = useRef(null);
@@ -203,6 +207,15 @@ export default function Home() {
 
   /* ── init ── */
   useEffect(() => {
+    // Auth guard
+    try {
+      const user = localStorage.getItem('user');
+      if (!user) {
+        navigate('/login', { replace: true });
+        return;
+      }
+    } catch (e) {}
+
     (async () => {
       try {
         await Promise.all([
@@ -218,6 +231,12 @@ export default function Home() {
     gsap.fromTo('.sp-sidebar', { x:-50, opacity:0 }, { x:0, opacity:1, duration:0.7, ease:'power3.out' });
     gsap.fromTo('.sp-main',    { opacity:0 },         { opacity:1, duration:0.9, ease:'power2.out', delay:0.2 });
     gsap.fromTo('.sp-bar',     { y:80, opacity:0 },   { y:0, opacity:1, duration:0.6, ease:'back.out(1.5)', delay:0.4 });
+  }, [navigate]);
+
+  /* Set initial volume CSS and audio properties */
+  useEffect(() => {
+    if (volRef.current) volRef.current.style.setProperty('--vol', `${volume * 100}%`);
+    if (audioRef.current) audioRef.current.volume = volume;
   }, []);
 
   /* close profile dropdown on outside click */
@@ -231,17 +250,38 @@ export default function Home() {
   /* ── fetch songs ── */
   const fetchSongs = async () => {
     try {
-      const { data } = await axios.get('http://localhost:3000/api/songs/local', { withCredentials:true });
-      if (data.songs) {
+      const { data } = await axios.get(`${BACKEND_URL}/api/songs/local`, { withCredentials: true });
+      if (data.songs && data.songs.length > 0) {
         const mapped = data.songs.map((filename, i) => ({
-          id: i, filename,
+          id: i,
+          filename,
           ...SONGS[i % SONGS.length],
           cover: `https://picsum.photos/seed/${i + 77}/300/300`,
         }));
         setSongs(mapped);
         setDisplayed(mapped);
+      } else {
+        // Fallback default catalog
+        const fallback = SONGS.map((s, i) => ({
+          id: i,
+          filename: `song_${i}.mp3`,
+          ...s,
+          cover: `https://picsum.photos/seed/${i + 77}/300/300`,
+        }));
+        setSongs(fallback);
+        setDisplayed(fallback);
       }
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.warn('Backend unavailable, displaying catalog:', e);
+      const fallback = SONGS.map((s, i) => ({
+        id: i,
+        filename: `song_${i}.mp3`,
+        ...s,
+        cover: `https://picsum.photos/seed/${i + 77}/300/300`,
+      }));
+      setSongs(fallback);
+      setDisplayed(fallback);
+    }
   };
 
   /* ── filter logic ── */
@@ -416,15 +456,41 @@ export default function Home() {
     }
   }, [isPlaying, songIdx]);
 
-  /* ── Search overlay keyboard shortcut ── */
+  /* ── Keyboard shortcuts ── */
   useEffect(() => {
     const handler = (e) => {
-      if (e.key === 'Escape') { setSearchOpen(false); setAddToPlaylistCtx(null); }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); setSearchOpen(s => !s); }
+      const activeTag = document.activeElement?.tagName?.toLowerCase();
+      const isInput = activeTag === 'input' || activeTag === 'textarea';
+
+      if (e.key === 'Escape') {
+        setSearchOpen(false);
+        setAddToPlaylistCtx(null);
+        setProfileOpen(false);
+        setSettingsOpen(false);
+        setPlaylistModal(false);
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setSearchOpen(s => !s);
+      }
+      if (!isInput) {
+        if (e.code === 'Space') {
+          e.preventDefault();
+          togglePlay();
+        } else if (e.key === 'm' || e.key === 'M') {
+          toggleMute();
+        } else if (e.key === 'ArrowRight' && (e.ctrlKey || e.metaKey)) {
+          e.preventDefault();
+          skipN();
+        } else if (e.key === 'ArrowLeft' && (e.ctrlKey || e.metaKey)) {
+          e.preventDefault();
+          skipP();
+        }
+      }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, []);
+  }, [togglePlay, toggleMute, skipN, skipP]);
 
   useEffect(() => {
     if (searchOpen) setTimeout(() => searchInputRef.current?.focus(), 80);
@@ -537,7 +603,22 @@ export default function Home() {
             <span/>
             <div className="search-box">
               <FaSearch size={14} className="search-icon"/>
-              <input className="search-input" placeholder="What do you want to play?" value={searchQ} onChange={e=>{setSearchQ(e.target.value);setLockedMood(null);}}/>
+              <input
+                className="search-input"
+                placeholder="What do you want to play?"
+                value={searchQ}
+                onChange={e=>{setSearchQ(e.target.value);setLockedMood(null);}}
+              />
+              {searchQ && (
+                <button
+                  type="button"
+                  className="search-clear-btn"
+                  onClick={() => setSearchQ('')}
+                  title="Clear search"
+                >
+                  <MdClose size={14} />
+                </button>
+              )}
             </div>
             {/* left spacer — grid col 1 is empty, search is col 2, badge is col 3 */}
             {lockedCfg ? (
@@ -573,7 +654,7 @@ export default function Home() {
                       <MdInfo size={16}/> About Moodify
                     </button>
                     <hr className="profile-divider"/>
-                    <button className="profile-menu-item profile-logout" onClick={()=>{localStorage.clear();window.location.href='/';}}>
+                    <button className="profile-menu-item profile-logout" onClick={()=>{localStorage.removeItem('user'); navigate('/login');}}>
                       <MdLogout size={16}/> Log out
                     </button>
                   </div>
@@ -773,7 +854,14 @@ export default function Home() {
                 <span className="bar-title">{currentSong.title}</span>
                 <span className="bar-artist">{currentSong.artist}</span>
               </div>
-              <FaHeart size={14} className="bar-like"/>
+              <button
+                type="button"
+                className={`bar-like-btn ${likedSongs.has(currentSong.id) ? 'bar-liked' : ''}`}
+                onClick={(e) => toggleLike(currentSong.id, e)}
+                title={likedSongs.has(currentSong.id) ? 'Remove from Liked' : 'Save to Liked'}
+              >
+                <FaHeart size={15} />
+              </button>
             </>
           ) : (
             <span className="bar-idle">Choose a song to play</span>
@@ -831,13 +919,14 @@ export default function Home() {
 
         <audio
           ref={audioRef}
-          src={currentSong?`http://localhost:3000/api/songs/stream/${encodeURIComponent(currentSong.filename)}`:''}
+          src={currentSong?.url || (currentSong?.filename ? `${BACKEND_URL}/api/songs/stream/${encodeURIComponent(currentSong.filename)}` : '')}
           autoPlay={isPlaying}
           onEnded={onEnded}
           onPlay={()=>setIsPlaying(true)}
           onPause={()=>setIsPlaying(false)}
           onTimeUpdate={onTimeUpdate}
           onLoadedMetadata={onTimeUpdate}
+          onError={(e) => console.warn('Audio playback error', e)}
         />
       </footer>
 
@@ -1011,7 +1100,7 @@ export default function Home() {
 
                   <div className="settings-section">
                     <h3 className="settings-section-title">Danger Zone</h3>
-                    <button className="settings-danger-btn" onClick={()=>{localStorage.clear();window.location.href='/';}}>Log out of Moodify</button>
+                    <button className="settings-danger-btn" onClick={()=>{localStorage.removeItem('user'); navigate('/login');}}>Log out of Moodify</button>
                   </div>
                 </div>
               )}

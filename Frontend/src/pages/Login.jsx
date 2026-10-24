@@ -7,6 +7,8 @@ import { FaMusic, FaEye, FaEyeSlash } from 'react-icons/fa';
 import { MdEmail, MdLock, MdPerson } from 'react-icons/md';
 import './Login.css';
 
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+
 export default function Login() {
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
@@ -16,6 +18,16 @@ export default function Login() {
   const [showPass, setShowPass] = useState(false);
   const cardRef = useRef(null);
   const logoRef = useRef(null);
+
+  useEffect(() => {
+    // Redirect if already authenticated
+    try {
+      const saved = localStorage.getItem('user');
+      if (saved) {
+        navigate('/home', { replace: true });
+      }
+    } catch (e) {}
+  }, [navigate]);
 
   useEffect(() => {
     const tl = gsap.timeline();
@@ -34,13 +46,17 @@ export default function Login() {
   const handleManualAuth = async (e) => {
     e.preventDefault();
     setErrorMsg('');
+    if (!isLogin && formData.password.length < 6) {
+      setErrorMsg('Password must be at least 6 characters long.');
+      return;
+    }
     setLoading(true);
     try {
       const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
       const payload = isLogin
         ? { email: formData.email, password: formData.password }
         : { email: formData.email, password: formData.password, username: formData.username };
-      const res = await axios.post(`http://localhost:3000${endpoint}`, payload, { withCredentials: true });
+      const res = await axios.post(`${BACKEND_URL}${endpoint}`, payload, { withCredentials: true });
       if (res.data.user) {
         localStorage.setItem('user', JSON.stringify(res.data.user));
         gsap.to(cardRef.current, { scale: 0.95, opacity: 0, y: -20, duration: 0.4, ease: 'power2.in', onComplete: () => navigate('/home') });
@@ -63,7 +79,7 @@ export default function Login() {
           headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
         });
         // Build a mock JWT payload for backend compatibility
-        const res = await axios.post('http://localhost:3000/api/auth/google', {
+        const res = await axios.post(`${BACKEND_URL}/api/auth/google`, {
           credential: tokenResponse.access_token,
           userInfo: info.data,
         }, { withCredentials: true });

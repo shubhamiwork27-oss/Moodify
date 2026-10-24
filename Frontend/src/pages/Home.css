@@ -284,6 +284,22 @@ body{
   width:100%;
   caret-color:var(--green);
 }
+.search-clear-btn{
+  background:none;
+  border:none;
+  color:rgba(255,255,255,.5);
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:2px;
+  border-radius:50%;
+  transition:color .15s, background .15s;
+}
+.search-clear-btn:hover{
+  color:#fff;
+  background:rgba(255,255,255,.15);
+}
 .search-input::placeholder{color:rgba(255,255,255,.45);}
 
 /* Filter pills row */
@@ -1157,12 +1173,16 @@ kbd{
   font-size:.72rem;color:var(--muted);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
-.bar-like{
+.bar-like, .bar-like-btn{
   flex-shrink:0;background:none;border:none;
-  color:var(--muted);cursor:pointer;padding:.25rem;
+  color:var(--muted);cursor:pointer;padding:.3rem;
+  border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
   transition:color .15s,transform .15s;margin-left:.1rem;
 }
-.bar-like:hover{color:#1db954;transform:scale(1.15);}
+.bar-like:hover, .bar-like-btn:hover{color:#fff;transform:scale(1.15);}
+.bar-like-btn.bar-liked{color:#e25454!important;}
+.bar-like-btn.bar-liked:hover{color:#ff6b6b!important;transform:scale(1.18);}
 .bar-idle{font-size:.8rem;color:var(--muted);}
 
 /* ─── CENTER: Controls + Progress ─── */
@@ -1267,6 +1287,42 @@ kbd{
 }
 /* Show ring around volume area when scrolling */
 .bar-right:focus-within .vol-slider{height:5px;}
+
+/* ═══════════════════════════════════════════════
+   RESPONSIVE LAYOUT
+═══════════════════════════════════════════════ */
+@media (max-width: 1024px) {
+  .sp-shell {
+    grid-template-columns: var(--sidebar) 1fr;
+    grid-template-areas: "side main" "bar bar";
+  }
+  .sp-right {
+    display: none;
+  }
+  .search-box {
+    width: 260px;
+  }
+}
+
+@media (max-width: 768px) {
+  :root {
+    --sidebar: 56px;
+    --bar: 72px;
+  }
+  .search-box {
+    width: 180px;
+  }
+  .tl-cols-label {
+    grid-template-columns: 28px 1fr 60px;
+  }
+  .tr-artist-col, .tl-cols-label span:nth-child(3) {
+    display: none;
+  }
+  .vol-slider {
+    width: 60px;
+  }
+}
+
 
 
 
