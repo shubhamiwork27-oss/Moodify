@@ -7,6 +7,17 @@ const path = require("path")
 const router = express.Router()
 
 /**
+ * Helper to resolve songs folder path in Frontend/public/songs or fallback
+ */
+const getSongsDir = () => {
+    const frontendPublicSongs = path.join(__dirname, '../../../Frontend/public/songs');
+    if (fs.existsSync(frontendPublicSongs)) return frontendPublicSongs;
+    const lowerFrontendPublicSongs = path.join(__dirname, '../../../frontend/public/songs');
+    if (fs.existsSync(lowerFrontendPublicSongs)) return lowerFrontendPublicSongs;
+    return path.join(__dirname, '../../../songs');
+};
+
+/**
  * POST /api/songs/
  */
 router.post("/", upload.single("song"), songController.uploadSong)
@@ -14,15 +25,17 @@ router.post("/", upload.single("song"), songController.uploadSong)
 router.get('/', songController.getSong)
 
 router.get('/local', (req, res) => {
-    const songsDir = path.join(__dirname, '../../../songs');
+    const songsDir = getSongsDir();
     if (!fs.existsSync(songsDir)) return res.json({ songs: [] });
     const files = fs.readdirSync(songsDir).filter(f => f.endsWith('.mp3'));
     res.json({ songs: files });
 });
 
 router.get('/stream/:filename', (req, res) => {
-    const filePath = path.join(__dirname, '../../../songs', req.params.filename);
+    const songsDir = getSongsDir();
+    const filePath = path.join(songsDir, req.params.filename);
     if (!fs.existsSync(filePath)) return res.status(404).send('Not found');
     res.sendFile(filePath);
 });
+
 module.exports = router

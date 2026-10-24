@@ -255,6 +255,7 @@ export default function Home() {
         const mapped = data.songs.map((filename, i) => ({
           id: i,
           filename,
+          url: `/songs/${encodeURIComponent(filename)}`,
           ...SONGS[i % SONGS.length],
           cover: `https://picsum.photos/seed/${i + 77}/300/300`,
         }));
@@ -265,6 +266,7 @@ export default function Home() {
         const fallback = SONGS.map((s, i) => ({
           id: i,
           filename: `song_${i}.mp3`,
+          url: `/songs/song_${i}.mp3`,
           ...s,
           cover: `https://picsum.photos/seed/${i + 77}/300/300`,
         }));
@@ -276,6 +278,7 @@ export default function Home() {
       const fallback = SONGS.map((s, i) => ({
         id: i,
         filename: `song_${i}.mp3`,
+        url: `/songs/song_${i}.mp3`,
         ...s,
         cover: `https://picsum.photos/seed/${i + 77}/300/300`,
       }));
@@ -919,14 +922,20 @@ export default function Home() {
 
         <audio
           ref={audioRef}
-          src={currentSong?.url || (currentSong?.filename ? `${BACKEND_URL}/api/songs/stream/${encodeURIComponent(currentSong.filename)}` : '')}
+          src={currentSong?.url || (currentSong?.filename ? `/songs/${encodeURIComponent(currentSong.filename)}` : '')}
           autoPlay={isPlaying}
           onEnded={onEnded}
           onPlay={()=>setIsPlaying(true)}
           onPause={()=>setIsPlaying(false)}
           onTimeUpdate={onTimeUpdate}
           onLoadedMetadata={onTimeUpdate}
-          onError={(e) => console.warn('Audio playback error', e)}
+          onError={(e) => {
+            // Fallback to backend stream endpoint if static public file isn't loaded
+            if (currentSong?.filename && audioRef.current && !audioRef.current.src.includes('/api/songs/stream/')) {
+              audioRef.current.src = `${BACKEND_URL}/api/songs/stream/${encodeURIComponent(currentSong.filename)}`;
+              if (isPlaying) audioRef.current.play().catch(() => {});
+            }
+          }}
         />
       </footer>
 
